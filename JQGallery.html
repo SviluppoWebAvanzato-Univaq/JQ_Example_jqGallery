@@ -1,0 +1,309 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>JQuery Gallery(plugin)</title>	
+		<link rel="stylesheet" href="iw_examples.css"/>
+		<style>		
+		.gallery {
+			border: 1px solid #4285f4;
+			border-radius: 10px;
+			overflow:hidden;
+		}
+		.gallery > .current-slide
+		{
+			position: relative;
+			width:100%;
+		}
+		.gallery > .current-slide > img {
+			margin: auto;
+			display:block;
+			height: 300px;
+			width: auto;			
+		}
+		.gallery .nextbtn, .gallery .prevbtn
+		{
+			position: absolute;
+			top: 50%;
+			cursor: pointer;
+			color: white;
+			font-weight: bold;
+		}
+		.gallery .nextbtn
+		{
+			right: 2%;
+		}
+		.gallery .prevbtn
+		{
+			left: 2%;			
+		}
+		.gallery > .slides
+		{
+			width: 100%;
+			position: relative;
+			border-top: 2px solid #4285f4;
+			background: #4285f4;
+		}		
+		.gallery > .slides > .slider
+		{
+			margin-left: auto;
+			margin-right: auto;
+		}
+
+		.gallery > .slides > .slider > ul
+		{
+			display: block;
+			margin: 0;
+			padding: 0;
+		}
+
+		.gallery > .slides > .slider > ul > li
+		{
+			float: left;
+			list-style-type: none;
+			border: 1px solid white;
+			border-radius: 5px;
+		}
+
+		.gallery > .slides > .slider > ul > li > img
+		{
+			display: block;
+			margin: auto;
+
+		}
+		</style>
+		
+		<script src="jquery.min.js">/* */</script>
+		
+		<script>
+
+		//DEFINIZIONE PLUGIN
+	
+		//TRUCCO DI SICUREZZA (qui disabilitato)
+		//definiamo una funzione e la chiamiamo immediatamente: questo crea una closure
+		//che "mette in sicurezza" tutto il nostro script, congelando le variabili $, window e document
+		//e proteggendole da eventuali modifiche esterne. Inoltre tutto ciò che è dichiarato nella closure
+		//sarà privato e non esposto al mondo esterno, a meno che non sia restituito.
+		//;( function( $, window, document, undefined ) {
+					
+			// Costruttore dell'Oggetto GalleryPlugin
+			function GalleryPlugin ( element, options ) {
+				//usiamo questo alias per rendere più chiari i riferimenti nelle espressioni:
+				//scriveremo instance.v per fare riferimento a metodi e proprietà pubbliche dell'istanza dell'oggetto-plugin
+				var instance = this;
+				
+				//ATTRIBUTI PUBBLLICI	
+				//aggiunti all'oggetto creato (instance)
+				instance.element = element;
+				//i settings dell'istanza sono ottenuti mescolando 
+				//quelli di default con quelli passati al costruttore
+				instance.settings = $.extend( {}, $.fn["awdGallery"].defaults, options );
+
+				//ATTRIBUTI PRIVATI 
+				//grazie alla closure realizzata dal costrutture, saranno disponibili 
+				//per tutte le funzioni dichiarate in questo scope, ma non essendo inserite
+				//nell'oggetto creato (instance) saranno invisibili nall'esterno
+				var _icurslide = 0; 
+				var _slider = $(".slides > .slider",instance.element);
+				var _slidelist = $(" > ul ",_slider);
+				var _slideimg = $(" > li > img",_slidelist);
+				var _nslides = _slideimg.length; 
+				var _prevbtn = $(".prevbtn",instance.element);
+				var _nextbtn = $(".nextbtn",instance.element);
+				var _curslide = $(".current-slide",instance.element);
+				var _curslideimg = $(".current-slide > img",instance.element);			
+								
+				///METODI PUBBLICI					
+				instance.showSlide = function( islide ) {
+					if (islide<0 || islide >= _nslides || islide == _icurslide) return;
+					_curslideimg.fadeOut('slow', function () {
+						_icurslide = islide; 
+						//usiamo una funzione callback per determinare la url dell'immagine fullsize a partire dalla thumbnail
+						var fullsizeURL = instance.settings.getFullSizeURL($(_slideimg[_icurslide]).attr("src"));
+						//potevamo anche usare un preloading/caching, per velocizzare il caricamento
+						_curslideimg.attr('src', fullsizeURL); 
+						//mostriamo l'immagine aggiornata
+						_curslideimg.fadeIn();				
+						//manipoliamo le thumbnails se necessario
+						ensureSlideVisible(islide);
+						//aggiorniamo lo stato dei bottoni
+						if (_icurslide >= _nslides-1) _nextbtn.hide(); 	else _nextbtn.show(); 
+						if (_icurslide == 0) _prevbtn.hide(); else _prevbtn.show(); 
+					});
+				}
+				
+				instance.slideSlider = function( islide ) {
+					if (islide<0 || islide >= _nslides) return;
+					ensureSlideVisible(islide);
+				}
+				
+				///METODI PRIVATI					
+				var ensureSlideVisible = function( islide ) {
+						var firstvisible = -parseFloat(_slidelist.css("margin-left"))/instance.settings.slidewidth;
+						var lastvisible = firstvisible+instance.settings.nshown-1;
+						if (islide < firstvisible) {
+							_slidelist.animate({ 'margin-left': '+=' +(firstvisible-islide)*instance.settings.slidewidth}, 1000); 	
+						} else if (islide>lastvisible) {
+							_slidelist.animate({ 'margin-left': '-=' +(islide-lastvisible)*instance.settings.slidewidth}, 1000); 	
+						}					
+				}
+				
+				var init = function() {
+					//posizioniamo lo slider
+					_slidelist.css("margin-left",0);
+					//inizializziamo la dimensione delle slide
+					_slider.width(instance.settings.slidewidth * instance.settings.nshown);
+					_slider.height(instance.settings.slideheight);
+					//inizializziamo queste proprietà CSS qui, in modo che se lo script non
+					//funziona la lista delle slide sia meglio formattata (accessibilità)
+					_slider.css("overflow", "hidden");
+					_slidelist.css("width","8000px");
+					_slideimg.each(function(){
+						var xslideborder = parseFloat($(this).parent().css("border-left-width"))+ parseFloat($(this).parent().css("border-right-width"));
+						var yslideborder = parseFloat($(this).parent().css("border-top-width"))+ parseFloat($(this).parent().css("border-bottom-width"));
+						$(this).parent().css({"width":instance.settings.slidewidth-xslideborder, "height": instance.settings.slideheight-yslideborder});
+						var xratio = (instance.settings.slidewidth-xslideborder) / $(this).width();
+						var yratio = (instance.settings.slideheight-yslideborder) / $(this).height();
+						if (xratio < yratio) $(this).css({"width":instance.settings.slidewidth-xslideborder, "height":"auto"});
+						else $(this).css({"width":"auto", "height":instance.settings.slideheight-yslideborder});
+					});
+					
+					//agganciamo gli eventi
+					_nextbtn.click(function () {
+						instance.showSlide(_icurslide+1);
+					});
+					
+					_prevbtn.click(function () {
+						instance.showSlide(_icurslide-1);
+					});
+					
+					_slideimg.click(function () {
+						var islide = $(this).parent("li").index();
+						instance.showSlide(islide);
+					});
+					
+					//visualizziamo la prima slide
+					instance.showSlide(0);
+				}
+				
+				//inizializziamo l'istanza del plugin
+				init();								
+			} 
+			
+			///////////////////////////////////////////
+			
+			//questa funzione callback traduce la URL ti una thumbnail in quella dell'immagine fullsize
+			//può essere sovrascritta: infatti showSlide non la chiama direttamente, ma chiama invece la
+			//funzione getFullSizeURL definita tra le opzioni dell'istanza (il cui default punta qui)
+			var _getFullSizeURL = function(thumbURL) {
+				return thumbURL; //l'immagine, di default, è la stessa: è il browser che la ridimensiona (!)
+			}
+			
+			///////////////////////////////////////////
+
+			//agganciamo il plugin come estensione di JQuery
+			$.fn["awdGallery"] = function( options,...args ) {
+				
+				//estrazione, dalla variabile riservata javascript "arguments" contenente
+				//l'array dei parametri della funzione corrente, degli eventuali parametri extra
+				//da passare al metodo indicato da options
+				//var args Array.prototype.slice.call( arguments, 1 )
+				//non necessaria usando il rest operator di ES5
+				
+				//se alla funzione "awdGallery" viene passato un array (anche vuoto)
+				//di opzioni, allora creiamo l'oggetto GalleryPlugin e lo agganciamo all'oggetto
+				//sul quale la funzione è stata richiamata.
+				if (options === undefined || typeof options === 'object') {
+					//ritornando this (o il risultato di this.each, che è sempre this)
+					//permettiamo il chaining, cioè l'applicazione di metodi a catena su uno
+					//stesso oggetto JQuery
+					return this.each( function() {
+						//l'istanza dall'oggetto GalleryPlugin verrà inserita tra i dati
+						//associati all'oggetto su cui è richiamato. Controlliamo
+						//anche che la cosa sia fatta una volta sola...
+						if ( !$(this).data("plugin_" + "awdGallery" ) ) {
+							$(this).data("plugin_" + "awdGallery", new GalleryPlugin( this, options ) );
+						}
+						//Potremo quindi accedere ai metodi e alle proprietà pubbliche dell'oggetto plugin
+						//agganciato a un elemento del DOM scrivendo $(elemento).data("plugin_awdGallery")
+					});
+				} else if (typeof options === 'string') {
+				//ESTENSIONE: se passiamo alla funzione una stringa, interpretiamo questo come una richiesta
+				//di chiamata a un metodo pubblico dell'oggetto GalleryPlugin. Questa sintassi è spesso preferita,
+				//nei plugin di jquery, a quella più ovvia appena citata (cioè prelevare l'oggetto dall'array
+				//data dell'elemento e su questo chiamare direttamente il metodo).
+					var returns;
+					this.each(function () {
+						//preleviamo l'istanza del GalleryPlugin associata all'elemento corrente (e ne controlliamo la validità)
+						var plugin_instance = $(this).data('plugin_' + "awdGallery");
+						if (plugin_instance instanceof GalleryPlugin && typeof plugin_instance[options] === 'function') {
+							//usiamo il metodo apply dell'oggetto function corrispondente al metodo del GalleryPlugin
+							//richiesto dalla stringa options. Apply prende come primo parametro l'istanza su cui
+							//richiamare il metodo e come secondo parametro l'array dei suoi argomenti, che otteniamo
+							//considerando tutti i parametri eventualmente passati a awdGallery dopo la stringa options.
+							returns = plugin_instance[options].apply( plugin_instance, args );
+						}
+					});
+					//ritorniamo this per permettere la concatenazione dei metodi di JQuery, a meno che il metodo chiamato
+					//non voglia ritornare qualcosa di diverso
+					return returns !== undefined ? returns : this;
+				}
+			};
+			
+			//i default del plugin, accessibili dall'esterno e modificabili
+			//li inseriamo come proproetà della funzione che attiva il
+			//plugin stesso, appena definita
+			$.fn["awdGallery"].defaults = {
+				slidewidth: 200,
+				slideheight: 100,
+				nshown: 3,
+				getFullSizeURL: _getFullSizeURL
+			};
+
+		//TRUCCO DI SICUREZZA (qui disabilitato)
+		//vedi inizio script
+		//})(jQuery, window, document );
+		
+		
+	</script>
+
+	<script>
+	
+		//USO PLUGIN		
+		//lo attiviamo al caricamento di tutta la pagina, non solo del DOM (ready), perchè ci servono anche le immagini...
+		$(window).on("load",function() {
+			$("#gallery").awdGallery({nshown: 4, slidewidth: 100});
+			//grazie all'estensione, possiamo anche chiamare un metodo pubblico come segue:
+			$("#gallery").awdGallery("showSlide",4);
+		});	
+	</script>
+
+	</head>
+	<body>
+
+
+	<h1>JQuery Gallery(plugin)</h1>
+
+	<div id="gallery" class="gallery">
+		<div class="current-slide">
+			<img src="donald.jpg" width="800" height="600" alt="current image"/>			
+		</div>
+		<div class="slides">
+		<span id="Previous" class="prevbtn">Prev</span>	
+				<div class="slider">
+				<ul>
+					<li><img src="donald.jpg" alt="Image 1" width="200"/></li>
+					<li ><img src="daisy.jpg" alt="Image 2" width="200"/></li>
+					<li ><img src="mickey.jpg" alt="Image 3" width="200"/></li>
+					<li ><img src="minnie.jpg" alt="Image 4" width="200"/></li>
+					<li ><img src="pluto.jpg" alt="Image 5" width="200"/></li>      
+					<li ><img src="goofy.gif" alt="Image 6" width="200"/></li>                 
+				</ul>
+				</div>
+			<span id="Next" class="nextbtn">Next</span>
+		</div>
+	</div>
+
+	</body>
+</html>
+			
